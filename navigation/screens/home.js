@@ -2,10 +2,12 @@ import React, { useRef } from 'react';
 import { StyleSheet, SafeAreaView, Text, View, TouchableOpacity, ScrollView, Animated } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { useNavigation } from '@react-navigation/native';
 
 const Home = () => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const bounceAnim = useRef(new Animated.Value(1)).current;
+  const navigation = useNavigation();
 
   React.useEffect(() => {
     // Fade-in animation
@@ -77,8 +79,11 @@ const Home = () => {
               <Text style={styles.announcementDescription}>
                 Check your reports and compare the improvements we're making day by day!
               </Text>
-              <TouchableOpacity style={styles.actionButton}>
-                <Text style={styles.actionButtonText}>Get Involved</Text>
+              <TouchableOpacity 
+                style={styles.actionButton}
+                onPress={() => navigation.navigate('ReportsScreen')}
+              >
+                <Text style={styles.actionButtonText}>View Reports</Text>
               </TouchableOpacity>
             </View>
           </Animated.View>

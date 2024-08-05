@@ -1,12 +1,27 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, SafeAreaView, ScrollView, Dimensions } from 'react-native';
-import { BarCodeScanner } from 'expo-barcode-scanner';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, SafeAreaView, ScrollView, Alert } from 'react-native';
+import { Camera } from 'expo-camera';
 import Checkbox from 'expo-checkbox';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
+import { initializeApp } from 'firebase/app';
+import { getFirestore, collection, addDoc, doc, getDoc, setDoc } from 'firebase/firestore';
 
-const ReportarDrop = () => {
+// Configuración de Firebase
+const firebaseConfig = {
+    apiKey: "AIzaSyDW7ONSg5yL4ZHXhMpJuH8SJEraySuqgO8",
+    authDomain: "drop-firebase-a0e56.firebaseapp.com",
+    projectId: "drop-firebase-a0e56",
+    storageBucket: "drop-firebase-a0e56.appspot.com",
+    messagingSenderId: "567200799139",
+    appId: "1:567200799139:web:9b9d850f7de21738d92216"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const reportarDrop = () => {
     const [selectedLine, setSelectedLine] = useState(null);
     const [serialNumber, setSerialNumber] = useState('');
     const [showLinePicker, setShowLinePicker] = useState(false);
@@ -17,22 +32,35 @@ const ReportarDrop = () => {
     const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
     const [selectedDate, setSelectedDate] = useState(null);
     const [isChecked, setIsChecked] = useState(Array(18).fill(false));
+    const [reportId, setReportId] = useState(null);
 
     useEffect(() => {
         (async () => {
-            const { status } = await BarCodeScanner.requestPermissionsAsync();
+            const { status } = await Camera.requestCameraPermissionsAsync();
             setHasPermission(status === 'granted');
         })();
+        getNextReportId();
     }, []);
+
+    const getNextReportId = async () => {
+        const counterRef = doc(db, 'counters', 'reportCounter');
+        try {
+            const counterDoc = await getDoc(counterRef);
+            if (counterDoc.exists()) {
+                setReportId(counterDoc.data().count + 1);
+            } else {
+                await setDoc(counterRef, { count: 0 });
+                setReportId(1);
+            }
+        } catch (error) {
+            console.error("Error getting next report ID: ", error);
+        }
+    };
 
     const handleLineSelection = (line) => {
         setSelectedLine(line);
         setShowLinePicker(false);
     };
-
-    const consultar = () => {
-        console.log('Estas seguro de enviar?');
-    }
 
     const handleScanSerialNumber = ({ type, data }) => {
         setSerialNumber(data);
@@ -67,11 +95,49 @@ const ReportarDrop = () => {
         'Name_Plate'
     ];
 
+    const saveReportToFirebase = async () => {
+        try {
+            const missingComponents = descriptions.filter((_, index) => isChecked[index]).join(', ');
+            const reportData = `${selectedLine}|${serialNumber}|${selectedDate ? selectedDate.toISOString() : ''}|${missingComponents}`;
+
+            const docRef = await addDoc(collection(db, "reports"), {
+                data: reportData,
+                timestamp: new Date()
+            });
+
+            console.log("Document written with ID: ", docRef.id);
+            setReportId(docRef.id); // Guardar el ID del reporte
+            Alert.alert('Success', `Report saved successfully! Report ID: ${docRef.id}`);
+            // Resetear los campos después de guardar
+            setSelectedLine(null);
+            setSerialNumber('');
+            setSelectedDate(null);
+            setIsChecked(Array(18).fill(false));
+        } catch (error) {
+            console.error('Error saving report: ', error);
+            Alert.alert('Error', 'Failed to save report. Please try again.');
+        }
+    };
+
+    const handleSubmit = () => {
+        if (!selectedLine || !serialNumber || !selectedDate) {
+            Alert.alert('Error', 'Please fill all required fields');
+            return;
+        }
+        saveReportToFirebase();
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView contentContainerStyle={styles.scrollView}>
                 <View style={styles.header}>
                     <Text style={styles.title}>Drop Report</Text>
+                </View>
+
+                <View style={styles.formSection}>
+                    <Text style={styles.label}>ID Reporte</Text>
+                    <TouchableOpacity style={styles.inputContainer} onPress={() => open}>
+                    </TouchableOpacity>
                 </View>
 
                 <View style={styles.formContainer}>
@@ -119,7 +185,7 @@ const ReportarDrop = () => {
                                 ) : hasPermission === false ? (
                                     <Text> Permission to use the camera has not been granted.</Text>
                                 ) : (
-                                    <BarCodeScanner
+                                    <Camera
                                         onBarCodeScanned={handleScanSerialNumber}
                                         style={StyleSheet.absoluteFillObject}
                                     />
@@ -151,10 +217,6 @@ const ReportarDrop = () => {
                     </View>
                 </View>
 
-                <TouchableOpacity style={styles.submitButton}>
-                    <Text style={styles.submitButtonText}>Search the Parts</Text>
-                </TouchableOpacity>
-
                 <View style={styles.formContainer}>
                     <Text style={styles.sectionTitle}>Select the missing components</Text>
                     <ScrollView style={styles.checkboxScrollView}>
@@ -172,14 +234,14 @@ const ReportarDrop = () => {
                     </ScrollView>
                 </View>
 
-                <TouchableOpacity style={styles.submitButton}>
+                <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
                     <Text style={styles.submitButtonText}>Send the report</Text>
                 </TouchableOpacity>
             </ScrollView>
         </SafeAreaView>
     );
 };
-
+export default reportarDrop;
 const styles = StyleSheet.create({
     container: {
         flex: 1,
@@ -204,6 +266,25 @@ const styles = StyleSheet.create({
         fontFamily: 'monospace',
         textTransform: 'uppercase',
         letterSpacing: 1.5,
+    },
+    reportIdContainer: {
+        backgroundColor: '#fff',
+        borderRadius: 10,
+        padding: 15,
+        marginBottom: 20,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    reportIdText: {
+        fontSize: 16,
+        color: '#282c34',
+        fontWeight: 'bold',
     },
     formContainer: {
         marginBottom: 20,
@@ -347,7 +428,6 @@ const styles = StyleSheet.create({
     description: {
         fontSize: 16,
         color: '#282c34',
-    },
+    },  
 });
 
-export default ReportarDrop;

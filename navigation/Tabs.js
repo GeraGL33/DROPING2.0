@@ -2,6 +2,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+
 import Home from '../navigation/screens/home';
 import MiPerfil from '../navigation/screens/miperfil';
 import ConsultarDrop from '../navigation/screens/consultarDrop';
@@ -72,6 +73,7 @@ const Tabs = () => {
                 <Tab.Screen name="Home" component={Home} />
                 <Tab.Screen name="View" component={ConsultarDrop} />
                 <Tab.Screen name="Report" component={ReportarDrop} />
+                
             </Tab.Navigator>
         </SafeAreaView>
     );
